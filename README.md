@@ -1,3 +1,5 @@
+[Google Colab]([https://colab.research.google.com/drive/12lK3Mr83Ez7Z6NhzyEiYzcCL80pICEYH#scrollTo=aCqDnE0FIB2F])
+
 ## **Classificação de Texto com NLTK, SpaCy e Scikit-Learn**
 
 A classificação de texto é uma tarefa essencial no processamento de linguagem natural (PLN), que envolve categorizar documentos de texto em diferentes classes ou categorias. Nesta apresentação, exploraremos como realizar essa tarefa utilizando três poderosas bibliotecas: NLTK, SpaCy e Scikit-Learn.
