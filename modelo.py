@@ -1,3 +1,4 @@
+# Bibliotecas
 import spacy
 import nltk
 import random
