@@ -5,6 +5,8 @@ import random
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+from imblearn.under_sampling import RandomUnderSampler
+from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
@@ -12,7 +14,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report
 
 # Entrada de dados
-data = pd.read_csv(r"/content/drive/MyDrive/UnidadeSeguranca20240126_085952.csv", sep = ';', encoding='latin1')
+data = pd.read_csv(r"UnidadeSeguranca20240126_085952.csv", sep = ';', encoding='latin1')
 
 # Baixando recursos adicionais do NLTK
 nltk.download('punkt')
@@ -30,28 +32,47 @@ training_data = training_data[pd.notnull(training_data['Descrição do Evento'])
 training_data.columns = ['text','label']
 print(training_data.info())
 
+# Treinar com os dados com especificação
+train = training_data[training_data.label != 'Não Especificado']
+test = training_data[training_data.label == 'Não Especificado']
+
 # Pré-processamento dos dados
 def preprocess_text(text):
     doc = nlp(text)
     tokens = [token.lemma_.lower() for token in doc if not token.is_stop and not token.is_punct]
     return " ".join(tokens)
 
-preprocessed_training_data = training_data.apply(lambda x: preprocess_text(x['text']), axis=1)
-base = pd.concat([pd.DataFrame(preprocessed_training_data),training_data['label']],axis=1)
+preprocessed_training_data = train.apply(lambda x: preprocess_text(x['text']), axis=1)
+base = pd.concat([pd.DataFrame(preprocessed_training_data),train['label']],axis=1)
 base.columns = ['text','label']
 print(base.head(3))
 
 # Divisão do dataset
-X_train, X_test, y_train, y_test = train_test_split(base.text, base.label, test_size=0.2, random_state=5486)
+X_train, X_test, y_train, y_test = train_test_split(base.text, base.label, test_size=0.2, random_state=654)
 
 # Vetorizando os textos
 vectorizer = CountVectorizer()
 X_train_vectorized = vectorizer.fit_transform(X_train)
 X_test_vectorized = vectorizer.transform(X_test)
 
-# Treinando o modelo de regressão logística
-classifier = LogisticRegression(max_iter=1000)
-classifier.fit(X_train_vectorized, y_train)
+# Treinamento de modelo de machine learning
+rus = RandomUnderSampler()
+X_train_rus, y_train_rus = rus.fit_resample(X_train_vectorized, y_train)
+
+param_grid = {
+    'n_estimators': [50, 200, 300],
+    'max_depth': [None, 2, 5, 10],
+    'min_samples_split': [2, 5, 10],
+    'min_samples_leaf': [1, 2, 4]
+}
+
+random_search = RandomizedSearchCV(estimator=RandomForestClassifier(), param_distributions=param_grid, n_iter=5, random_state=5654)
+random_search.fit(X_train_rus, y_train_rus)
+parametros = random_search.best_params_
+print("Parâmetros:", parametros)
+
+classifier = RandomForestClassifier(**parametros)
+classifier.fit(X_train_rus, y_train_rus)
 
 # Avaliando o modelo
 y_pred = classifier.predict(X_test_vectorized)
