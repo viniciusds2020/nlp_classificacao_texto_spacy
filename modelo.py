@@ -54,10 +54,11 @@ vectorizer = CountVectorizer()
 X_train_vectorized = vectorizer.fit_transform(X_train)
 X_test_vectorized = vectorizer.transform(X_test)
 
-# Treinamento de modelo de machine learning
+# Balanceamento do dataset
 rus = RandomUnderSampler()
 X_train_rus, y_train_rus = rus.fit_resample(X_train_vectorized, y_train)
 
+# Parâmetros do treinamento
 param_grid = {
     'n_estimators': [50, 200, 300],
     'max_depth': [None, 2, 5, 10],
@@ -65,11 +66,13 @@ param_grid = {
     'min_samples_leaf': [1, 2, 4]
 }
 
+# Busca dos melhores parâmetros via pesquisa aleatória
 random_search = RandomizedSearchCV(estimator=RandomForestClassifier(), param_distributions=param_grid, n_iter=5, random_state=5654)
 random_search.fit(X_train_rus, y_train_rus)
 parametros = random_search.best_params_
 print("Parâmetros:", parametros)
 
+# Treinamento com os melhores parâmetros
 classifier = RandomForestClassifier(**parametros)
 classifier.fit(X_train_rus, y_train_rus)
 
