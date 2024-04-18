@@ -9,7 +9,6 @@ from imblearn.under_sampling import RandomUnderSampler
 from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report
 
