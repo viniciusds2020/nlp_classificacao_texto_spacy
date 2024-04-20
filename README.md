@@ -1,5 +1,3 @@
-[Google Colab]([https://colab.research.google.com/drive/12lK3Mr83Ez7Z6NhzyEiYzcCL80pICEYH#scrollTo=aCqDnE0FIB2F])
-
 ## **Classificação de Texto com NLTK, SpaCy e Scikit-Learn**
 
 A classificação de texto é uma tarefa essencial no processamento de linguagem natural (PLN), que envolve categorizar documentos de texto em diferentes classes ou categorias. Nesta apresentação, exploraremos como realizar essa tarefa utilizando três poderosas bibliotecas: NLTK, SpaCy e Scikit-Learn.
@@ -15,8 +13,8 @@ Scikit-Learn é uma biblioteca amplamente utilizada para aprendizado de máquina
 
 **Passos para a Classificação de Texto:**
 - **Pré-processamento de Texto:** Limpeza de texto, tokenização, remoção de stop words, lematização ou stemming.
-- **Feature Engineering:** Representação de texto como vetores numéricos (e.g., TF-IDF, word embeddings).
-- **Escolha do Modelo:** Seleção do algoritmo de classificação adequado (Naive Bayes, SVM, redes neurais, etc.).
+- **Feature Engineering:** Representação de texto como vetores numéricos.
+- **Escolha do Modelo:** Seleção do algoritmo de classificação adequado.
 - **Treinamento e Avaliação:** Divisão dos dados em conjuntos de treino e teste, treinamento do modelo e avaliação de sua precisão e desempenho.
 
 **Conclusão:**
