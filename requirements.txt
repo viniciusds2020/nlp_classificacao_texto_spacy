@@ -9,7 +9,5 @@ spacy>=3.7
 fastapi>=0.111
 uvicorn[standard]>=0.29
 
-# Optional LLM fallbacks
-openai>=1.40
-tiktoken>=0.7
-anthropic>=0.34
+# Selective LLM fallback
+groq>=0.11
