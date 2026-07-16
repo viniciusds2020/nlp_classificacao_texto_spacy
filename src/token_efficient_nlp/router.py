@@ -30,19 +30,12 @@ class TokenEstimator:
     def __init__(self, model: str | None = None) -> None:
         self.model = model
         self._encoding = None
-        try:
-            import tiktoken
-
-            self._encoding = tiktoken.encoding_for_model(model) if model else tiktoken.get_encoding(
-                "cl100k_base"
-            )
-        except (ImportError, KeyError):
-            self._encoding = None
+        self._encoding = None
 
     def estimate(self, text: str) -> int:
-        if self._encoding is not None:
-            return len(self._encoding.encode(text))
-        return max(1, len(text) // 4)
+        # Provider usage supplies exact tokens after a Groq call. Before the
+        # call, use a conservative language-agnostic character heuristic.
+        return max(1, len(text.encode("utf-8")) // 4)
 
 
 class HybridClassifier:
