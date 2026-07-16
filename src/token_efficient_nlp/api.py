@@ -1,4 +1,4 @@
-"""FastAPI application for local-first classification."""
+"""FastAPI application for local-first classification with Groq fallback."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel, Field
 
 from token_efficient_nlp.model import LocalTextClassifier
-from token_efficient_nlp.providers import AnthropicProvider, OpenAIProvider
+from token_efficient_nlp.providers import GroqProvider
 from token_efficient_nlp.router import HybridClassifier
 
 
@@ -24,14 +24,12 @@ class BatchRequest(BaseModel):
 @lru_cache
 def router() -> HybridClassifier:
     model = LocalTextClassifier.load(os.getenv("MODEL_PATH", "artifacts/classifier.joblib"))
-    provider_name = os.getenv("LLM_PROVIDER", "").lower()
-    provider = None
-    if provider_name == "openai":
-        provider = OpenAIProvider(model=os.getenv("OPENAI_MODEL", "gpt-5-mini"))
-    elif provider_name == "anthropic":
-        provider = AnthropicProvider(
-            model=os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5")
-        )
+    use_groq = os.getenv("GROQ_ENABLED", "false").lower() in {"1", "true", "yes"}
+    provider = (
+        GroqProvider(model=os.getenv("GROQ_MODEL", "llama-3.1-8b-instant"))
+        if use_groq
+        else None
+    )
 
     return HybridClassifier(
         model,
@@ -43,14 +41,20 @@ def router() -> HybridClassifier:
 
 app = FastAPI(
     title="Token-Efficient NLP Router",
-    version="1.0.0",
-    description="Classificação local com fallback seletivo para LLM.",
+    version="1.1.0",
+    description="Classificação local com fallback seletivo para Groq/Llama.",
 )
 
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok", "labels": router().local_model.labels}
+    active_router = router()
+    return {
+        "status": "ok",
+        "labels": active_router.local_model.labels,
+        "fallback": getattr(active_router.provider, "name", None),
+        "fallback_model": getattr(active_router.provider, "model", None),
+    }
 
 
 @app.post("/classify")
