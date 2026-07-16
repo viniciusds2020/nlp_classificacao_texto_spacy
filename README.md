@@ -1,61 +1,60 @@
-# Token-Efficient NLP Router
+# Token-Efficient NLP Router — spaCy + Groq Llama
 
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![spaCy](https://img.shields.io/badge/NLP-spaCy-09A3D5?logo=spacy&logoColor=white)](https://spacy.io/)
-[![OpenAI](https://img.shields.io/badge/Fallback-OpenAI-412991?logo=openai)](https://platform.openai.com/docs/)
-[![Claude](https://img.shields.io/badge/Fallback-Claude-D97757)](https://docs.anthropic.com/)
+[![spaCy](https://img.shields.io/badge/Local_NLP-spaCy-09A3D5?logo=spacy&logoColor=white)](https://spacy.io/)
+[![Groq](https://img.shields.io/badge/Fallback-Groq_Llama-F55036)](https://console.groq.com/docs/)
+[![Llama](https://img.shields.io/badge/Model-Llama_3-6A5ACD)](https://console.groq.com/docs/models)
 
-Solução local-first para classificação de textos em português. spaCy, TF-IDF e Logistic Regression resolvem os casos confiáveis localmente; OpenAI ou Claude recebem apenas casos de baixa confiança.
+Classificação de textos em português com execução local e fallback seletivo para modelos Llama hospedados na Groq. O modelo local resolve casos confiáveis sem consumir tokens; a Groq recebe apenas casos incertos.
 
-O objetivo é reduzir tokens, custo, latência e exposição de dados sem abandonar a capacidade de generalização dos LLMs.
-
-## Estratégia
+## Arquitetura
 
 ```mermaid
 flowchart LR
-    T["Texto"] --> L["spaCy + modelo local"]
-    L --> C{"Confiança suficiente?"}
-    C -->|Sim| R["Resposta local: 0 tokens"]
-    C -->|Não| K{"Está no cache?"}
-    K -->|Sim| H["Resposta em cache"]
+    T["Texto"] --> S["spaCy + TF-IDF"]
+    S --> M["Logistic Regression"]
+    M --> C{"Confiança ≥ limite?"}
+    C -->|Sim| L["Resposta local<br/>0 tokens"]
+    C -->|Não| K{"Cache local?"}
+    K -->|Sim| H["Resposta armazenada"]
     K -->|Não| P["Prompt compacto"]
-    P --> M["OpenAI ou Claude"]
-    M --> R
+    P --> G["Groq + Llama 3"]
+    G --> R["Classe validada"]
 ```
 
-A solução economiza tokens em quatro pontos:
+## Como a economia acontece
 
-1. **Resolução local:** nenhuma chamada externa quando a confiança ultrapassa o limite;
-2. **fallback seletivo:** somente amostras incertas chegam ao LLM;
-3. **compactação:** spaCy remove stop words, pontuação e redundância antes do prompt;
-4. **cache:** textos repetidos não geram outra chamada.
+- casos confiáveis são classificados localmente;
+- somente baixa confiança é escalada;
+- o texto é normalizado e limitado antes do envio;
+- respostas repetidas usam cache local;
+- a saída é limitada a 60 tokens e somente JSON;
+- labels retornadas pela Groq são validadas contra a taxonomia do modelo.
 
-## Quando usar
+A aplicação compara o consumo real com uma estimativa do cenário em que 100% dos textos seriam enviados ao LLM.
 
-- classificação de chamados e tickets;
-- roteamento de documentos;
-- categorização de eventos e riscos;
-- classificação de intenção;
-- triagem de e-mails ou mensagens;
-- moderação baseada em taxonomia conhecida;
-- pré-roteamento antes de agentes ou RAG.
+## Modelos Groq
 
-A abordagem funciona melhor quando as classes são conhecidas e existe histórico rotulado. Tarefas abertas de geração, resumo ou raciocínio continuam sendo responsabilidade do LLM.
+| Modelo | Perfil | Uso sugerido |
+|---|---|---|
+| `llama-3.1-8b-instant` | mais rápido e econômico | fallback padrão de classificação |
+| `llama-3.3-70b-versatile` | maior capacidade | classes ambíguas ou textos complexos |
 
-## Arquitetura do projeto
+Os dois são modelos de produção da Groq. Consulte a [lista atual de modelos](https://console.groq.com/docs/models) antes de implantar.
+
+## Estrutura
 
 ```text
 src/token_efficient_nlp/
-├── preprocessing.py   # normalização em lote com spaCy
+├── preprocessing.py   # normalização spaCy
 ├── model.py           # TF-IDF + Logistic Regression
 ├── router.py          # confiança, cache e fallback
-├── providers.py       # OpenAI Responses API e Claude Messages API
-├── metrics.py         # tokens e cobertura local
-├── cli.py             # treinamento e inferência
+├── providers.py       # Groq Chat Completions
+├── metrics.py         # cobertura e tokens
+├── cli.py             # treino e inferência
 └── api.py             # FastAPI
 tests/
-examples/
-modelo.py              # entrada de compatibilidade
+examples/sample_events.csv
 ```
 
 ## Instalação
@@ -72,17 +71,7 @@ pip install -e ".[all]"
 python -m spacy download pt_core_news_sm
 ```
 
-Sem o modelo treinado de português, a aplicação utiliza `spacy.blank("pt")` como fallback de tokenização.
-
-## Treinamento
-
-O arquivo deve conter uma coluna de texto e outra de classe:
-
-```csv
-text,label
-"colaborador sem capacete na área operacional","EPI"
-"presença de fumaça no painel elétrico","Incêndio"
-```
+## Treinamento local
 
 ```bash
 token-nlp train \
@@ -92,68 +81,46 @@ token-nlp train \
   --output artifacts/classifier.joblib
 ```
 
-A CLI realiza split estratificado, imprime o relatório de classificação e salva modelo, vetorizador, labels e metadados em um único artefato.
+## Configuração
 
-## Inferência local
-
-```bash
-token-nlp predict \
-  --model artifacts/classifier.joblib \
-  --text "Iluminação deficiente com risco de tropeço"
-```
-
-```python
-from token_efficient_nlp import LocalTextClassifier
-
-model = LocalTextClassifier.load("artifacts/classifier.joblib")
-prediction = model.predict_one("Iluminação deficiente na passarela")
-
-print(prediction.label)
-print(prediction.confidence)
-print(prediction.alternatives)
-```
-
-## Configuração do fallback
-
-Copie `.env.example` para `.env` e selecione um provedor:
+Execução totalmente local:
 
 ```env
 MODEL_PATH=artifacts/classifier.joblib
 LOCAL_CONFIDENCE_THRESHOLD=0.80
-MAX_PROMPT_CHARS=2000
-
-LLM_PROVIDER=openai
-OPENAI_API_KEY=...
-OPENAI_MODEL=gpt-5-mini
+GROQ_ENABLED=false
 ```
 
-Para Claude:
+Fallback econômico com Llama 3.1 8B:
 
 ```env
-LLM_PROVIDER=anthropic
-ANTHROPIC_API_KEY=...
-ANTHROPIC_MODEL=claude-haiku-4-5
+GROQ_ENABLED=true
+GROQ_API_KEY=gsk_...
+GROQ_MODEL=llama-3.1-8b-instant
+MAX_PROMPT_CHARS=2000
 ```
 
-Os nomes de modelos devem ser revisados conforme disponibilidade da conta. Consulte a documentação oficial da [OpenAI](https://platform.openai.com/docs/models) e a lista de [modelos Claude](https://docs.anthropic.com/en/docs/about-claude/models/overview).
+Para maior capacidade:
 
-## API
+```env
+GROQ_MODEL=llama-3.3-70b-versatile
+```
+
+## Executar API
 
 ```bash
 token-nlp-api
 ```
 
-Documentação interativa: `http://localhost:8000/docs`.
-
-### Classificar
+Swagger: `http://localhost:8000/docs`.
 
 ```bash
 curl -X POST http://localhost:8000/classify \
   -H "Content-Type: application/json" \
-  -d '{"text":"fumaça saindo do equipamento"}'
+  -d '{"text":"fumaça saindo do painel elétrico"}'
 ```
 
-A resposta informa a origem da decisão:
+Resposta:
 
 ```json
 {
@@ -161,6 +128,8 @@ A resposta informa a origem da decisão:
   "confidence": 0.91,
   "source": "local",
   "reason": "confidence_threshold",
+  "provider": null,
+  "model": null,
   "input_tokens": 0,
   "output_tokens": 0,
   "estimated_tokens_avoided": 89,
@@ -168,16 +137,25 @@ A resposta informa a origem da decisão:
 }
 ```
 
-Rotas disponíveis:
+Quando escalado:
 
-| Método | Rota | Finalidade |
-|---|---|---|
-| `GET` | `/health` | saúde e classes do modelo |
-| `POST` | `/classify` | classificação unitária |
-| `POST` | `/classify/batch` | classificação em lote |
-| `GET` | `/metrics` | economia e roteamento |
+```json
+{
+  "label": "Incêndio",
+  "confidence": 0.88,
+  "source": "llm",
+  "reason": "low_local_confidence",
+  "provider": "groq",
+  "model": "llama-3.1-8b-instant",
+  "input_tokens": 74,
+  "output_tokens": 12,
+  "cached": false
+}
+```
 
-## Métricas de economia
+## Métricas
+
+`GET /metrics`:
 
 ```json
 {
@@ -193,45 +171,29 @@ Rotas disponíveis:
 }
 ```
 
-Os números acima são apenas um exemplo de formato. O projeto calcula:
+Os valores são ilustrativos. A economia real depende da cobertura local, repetição dos textos, limite de confiança e modelo escolhido.
 
-```text
-tokens evitados =
-tokens estimados se todas as requisições usassem LLM
-− tokens efetivamente consumidos
-```
+## Escolha do limite
 
-Para uma avaliação honesta, compare também:
+Calibre `LOCAL_CONFIDENCE_THRESHOLD` em validação:
 
-- macro F1 e recall por classe;
-- cobertura local;
-- precisão seletiva por faixa de confiança;
-- taxa de escalonamento;
-- latência p50/p95;
-- tokens médios por requisição;
-- custo por mil classificações.
-
-## Escolha do limite de confiança
-
-O valor `0.80` é apenas inicial. Selecione o limite em uma base de validação:
-
-| Limite | Cobertura local | Qualidade esperada | Uso de LLM |
+| Limite | Cobertura local | Precisão seletiva | Uso da Groq |
 |---:|---:|---:|---:|
-| menor | maior | menor | menor |
-| maior | menor | maior | maior |
+| menor | maior | tende a diminuir | menor |
+| maior | menor | tende a aumentar | maior |
 
-A métrica principal deve ser a precisão dos casos aceitos localmente, não apenas a acurácia global.
+Acompanhe macro F1, recall por classe, precisão dos casos aceitos localmente, escalonamento, latência e tokens por classificação.
 
-## Segurança e privacidade
+## Segurança
 
-- O texto é tratado como dado não confiável no prompt;
-- a resposta do provedor deve pertencer à lista de classes;
-- chaves não são armazenadas no repositório;
-- textos resolvidos localmente não saem do ambiente;
-- dados sensíveis devem ser anonimizados antes de qualquer fallback externo;
-- em produção, adicione autenticação, rate limiting e armazenamento externo para cache/métricas.
+- as chaves ficam apenas em variáveis de ambiente;
+- textos locais não saem do ambiente;
+- o prompt trata o texto como conteúdo não confiável;
+- a resposta precisa pertencer à lista de classes;
+- limite de saída reduz custo e superfície de geração;
+- dados pessoais devem ser anonimizados antes do fallback.
 
-## Testes
+## Desenvolvimento
 
 ```bash
 pip install -e ".[dev]"
@@ -239,18 +201,17 @@ ruff check src tests
 pytest --cov=token_efficient_nlp
 ```
 
-Os testes usam provedor falso e não consomem tokens reais.
+Os testes usam provedor falso e não realizam chamadas à Groq.
 
-## Limitações e roadmap
+## Roadmap
 
 - [ ] calibração de probabilidades;
-- [ ] curva cobertura × precisão;
+- [ ] curva cobertura × precisão × tokens;
 - [ ] cache Redis;
-- [ ] persistência Prometheus/OpenTelemetry;
-- [ ] fila de revisão humana;
-- [ ] detecção e anonimização de PII;
-- [ ] Batch API para casos não urgentes;
-- [ ] comparação experimental OpenAI × Claude × modelo local.
+- [ ] métricas Prometheus;
+- [ ] anonimização de PII antes do fallback;
+- [ ] Groq Batch API para cargas não urgentes;
+- [ ] comparação Llama 3.1 8B × Llama 3.3 70B.
 
 ## Autor
 
