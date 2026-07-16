@@ -29,8 +29,6 @@ class RoutingDecision:
 class TokenEstimator:
     def __init__(self, model: str | None = None) -> None:
         self.model = model
-        self._encoding = None
-        self._encoding = None
 
     def estimate(self, text: str) -> int:
         # Provider usage supplies exact tokens after a Groq call. Before the
