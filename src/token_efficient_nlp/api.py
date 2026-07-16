@@ -27,10 +27,10 @@ def router() -> HybridClassifier:
     provider_name = os.getenv("LLM_PROVIDER", "").lower()
     provider = None
     if provider_name == "openai":
-        provider = OpenAIProvider(model=os.getenv("OPENAI_MODEL", "gpt-4.1-mini"))
+        provider = OpenAIProvider(model=os.getenv("OPENAI_MODEL", "gpt-5-mini"))
     elif provider_name == "anthropic":
         provider = AnthropicProvider(
-            model=os.getenv("ANTHROPIC_MODEL", "claude-3-5-haiku-latest")
+            model=os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5")
         )
 
     return HybridClassifier(
