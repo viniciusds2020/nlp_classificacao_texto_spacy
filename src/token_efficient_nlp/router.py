@@ -115,7 +115,14 @@ class HybridClassifier:
         if key in self._cache:
             cached = self._cache.pop(key)
             decision = RoutingDecision(
-                **{**cached.__dict__, "cached": True, "reason": "cache_hit"}
+                **{
+                    **cached.__dict__,
+                    "cached": True,
+                    "reason": "cache_hit",
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "estimated_tokens_avoided": baseline_tokens,
+                }
             )
             self._cache[key] = decision
             self.metrics.record(local=False, cached=True, baseline_tokens=baseline_tokens)
